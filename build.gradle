@@ -1,0 +1,65 @@
+plugins {
+    alias libs.plugins.kotlin.jvm
+}
+
+group = 'io.github.juuxel'
+version = '1.0-SNAPSHOT'
+
+configurations {
+    compiler {
+        canBeResolved = true
+        canBeConsumed = false
+    }
+
+    implementation.extendsFrom compiler
+
+    quiltflower {
+        canBeResolved = true
+        canBeConsumed = false
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        url = 'https://maven.quiltmc.org/repository/release'
+        content {
+            includeGroup 'org.quiltmc'
+        }
+    }
+}
+
+dependencies {
+    compiler libs.kotlin.compiler
+    quiltflower 'org.quiltmc:quiltflower:1.9.0'
+    implementation 'org.ow2.asm:asm:9.2'
+}
+
+task decompileCompiler {
+    doLast {
+        def copy = configurations.compiler.copy()
+        copy.transitive = false
+        def compilerJar = copy.singleFile
+        def name = compilerJar.name
+        def dotIndex = name.lastIndexOf '.'
+        def sourcesJar = new File(compilerJar.parentFile, name.substring(0, dotIndex) + '-sources.' + name.substring(dotIndex + 1))
+
+        if (sourcesJar.exists()) {
+            sourcesJar.delete()
+        }
+
+        javaexec {
+            classpath configurations.quiltflower
+            mainClass = 'org.jetbrains.java.decompiler.main.decompiler.ConsoleDecompiler'
+
+            for (def file : configurations.compiler.resolve()) {
+                def path = file.absolutePath
+                if (path != compilerJar.absolutePath) {
+                    args "-e=$path"
+                }
+            }
+
+            args compilerJar.absolutePath, sourcesJar.absolutePath
+        }
+    }
+}
